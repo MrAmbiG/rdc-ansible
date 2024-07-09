@@ -1,0 +1,11 @@
+[Unit]
+Description=RDC Prometheus plugin
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/rocm-6.1.2/rdc/python_binding/rdc_prometheus.py --rdc_embedded
+Type=simple
+
+
+[Install]
+WantedBy=multi-user.target

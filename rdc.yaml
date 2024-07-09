@@ -1,0 +1,72 @@
+- hosts: rdc
+  become: yes
+  tasks:
+## Install RDC Dependencies Ubuntu
+  - name: install basic packages on ubuntu
+    apt:
+      pkg:
+        - automake
+        - make
+        - g++
+        - unzip
+        - build-essential
+        - autoconf
+        - libtool
+        - pkg-config
+        - libgflags-dev
+        - libgtest-dev
+        - clang
+#        - clang-5.0
+        - libc++-dev
+        - curl
+        - libnuma-dev
+        - wget
+        - gnupg2
+        - python3
+    when: ansible_distribution == "Ubuntu"
+
+
+## Non OS specific tasks
+  - name: Check if rdc installed
+    shell: pip show grpcio && echo 'present' || echo 'absent'
+    register: result
+    ignore_errors: yes
+
+  - name: Install grpc via pip
+    pip:
+      name: grpcio==1.28.1
+    when: result.stdout == "absent"
+
+  - name: check rocm.list repo # ubuntu only
+    stat:
+      path: /etc/apt/sources.list.d/rocm.list
+    register: rocm
+
+  - name: add key & configure repository # ubuntu only
+    shell: |
+      wget -q -O - https://repo.radeon.com/rocm/rocm.gpg.key | sudo apt-key add -
+      rm -rf etc/apt/sources.list.d/rocm.list
+      echo 'deb [arch=amd64] https://repo.radeon.com/rocm/apt/6.1.2/ jammy main' | sudo tee /etc/apt/sources.list.d/rocm.list
+      apt update -y
+    ignore_errors: yes
+    # when: not rocm.stat.exists
+
+  - name: Install RDC
+    apt:
+      name: rdc6.1.2
+
+  - name: prometheus client for rdc
+    pip:
+      name: prometheus_client
+
+  - name: copy rdc-prometheus.service file to systemd
+    copy:
+      src: rdc-prometheus.service
+      dest: /etc/systemd/system/rdc-prometheus.service
+
+  - name: Enable, reload and start service rdc-prometheus
+    ansible.builtin.systemd:
+      name: rdc-prometheus
+      enabled: yes
+      daemon_reload: yes
+      state: started
